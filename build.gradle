@@ -1,0 +1,69 @@
+apply plugin: 'java'
+
+sourceCompatibility = 1.7
+targetCompatibility = 1.7
+
+configurations {
+    ajc
+    aspects
+    ajInpath
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    ajc 'org.aspectj:aspectjtools:1.7.3'
+    compile 'org.aspectj:aspectjrt:1.7.3'
+    compile 'com.jcabi:jcabi-aspects:0.22.5'
+    compile 'org.slf4j:slf4j-log4j12:1.7.21'
+    aspects 'com.jcabi:jcabi-aspects:0.22.5'
+}
+
+sourceSets {
+    main {
+        resources {
+            exclude '**/*.aj'
+        }
+    }
+}
+
+/**
+ * Replace the standard compile action with that of the IAJC Ant task.
+ */
+compileJava.deleteAllActions()
+compileJava << {
+    ant.taskdef(
+            resource: 'org/aspectj/tools/ant/taskdefs/aspectjTaskdefs.properties',
+            classpath: configurations.ajc.asPath)
+    ant.iajc(
+            source: sourceCompatibility,
+            target: targetCompatibility,
+            destDir: sourceSets.main.output.classesDir.absolutePath,
+            fork: 'true',
+            X: 'noInline',
+            aspectPath: configurations.aspects.asPath,
+            inpath: configurations.ajInpath.asPath,
+            sourceRootCopyFilter: '**/*.java,**/*.aj',
+            classpath: configurations.compile.asPath) {
+
+        sourceroots {
+            sourceSets.main.java.srcDirs.each { dir ->
+                pathelement(location: dir.absolutePath)
+            }
+        }
+    }
+}
+
+//create a single Jar with all dependencies
+task fatJar(type: Jar) {
+    manifest {
+        attributes 'Implementation-Title': 'Gradle Jar File Example',
+                'Implementation-Version': "1.0",
+                'Main-Class': 'com.mkyong.DateUtils'
+    }
+    baseName = project.name + '-all'
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
